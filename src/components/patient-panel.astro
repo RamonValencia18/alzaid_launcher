@@ -1,0 +1,175 @@
+---
+/* src/components/PatientPanel.astro */
+---
+<dialog id="patient-panel-dialog" class="patient-modal">
+  <div class="modal-card">
+    <button id="close-patient-panel" class="close-btn" aria-label="Cerrar">&times;</button>
+
+    <div class="modal-header">
+      <div class="modal-media">
+        <img id="patient-panel-img" src="" alt="" class="modal-image" />
+        <div id="patient-panel-fallback" class="modal-image-fallback" style="display: none;">
+          <span id="patient-panel-initials" class="fallback-initials"></span>
+        </div>
+      </div>
+
+      <div class="header-info">
+        <h2 id="patient-panel-name" class="modal-heading"></h2>
+        <p id="patient-panel-age" class="patient-subtext"></p>
+      </div>
+    </div>
+
+    <div class="modal-info">
+      <div class="info-group">
+        <label>Diagnóstico / Condición</label>
+        <p id="patient-panel-condition" class="info-value">-</p>
+      </div>
+
+      <div class="info-group">
+        <label>Notas adicionales</label>
+        <p id="patient-panel-notes" class="info-value">-</p>
+      </div>
+
+      <div class="modal-actions">
+        <!-- Agregamos clase única y type="button" -->
+        <button type="button" class="action-btn btn-select-patient">
+          Seleccionar Paciente
+        </button>
+      </div>
+    </div>
+  </div>
+</dialog>
+
+<script>
+  import type { Patient } from "../objects/Patient";
+
+  const dialog = document.getElementById("patient-panel-dialog") as HTMLDialogElement | null;
+  const closeBtn = document.getElementById("close-patient-panel");
+  
+  // Seleccionamos directamente la clase del botón
+  const actionBtn = document.querySelector(".btn-select-patient");
+
+  const panelImg = document.getElementById("patient-panel-img") as HTMLImageElement;
+  const panelFallback = document.getElementById("patient-panel-fallback") as HTMLDivElement;
+  const panelInitials = document.getElementById("patient-panel-initials")!;
+  const panelName = document.getElementById("patient-panel-name")!;
+  const panelAge = document.getElementById("patient-panel-age")!;
+  const panelCondition = document.getElementById("patient-panel-condition")!;
+  const panelNotes = document.getElementById("patient-panel-notes")!;
+
+  let selectedPatientId: string | number | null = null;
+
+  // Verificación al cargar
+  console.log("Estado de inicialización del botón:", actionBtn ? "Botón encontrado OK" : "ERROR: Botón no encontrado");
+
+  window.addEventListener("patient:open", (e: Event) => {
+    const customEvent = e as CustomEvent<{ patient: Patient }>;
+    const patient = customEvent.detail?.patient;
+
+    if (!patient) return;
+
+    selectedPatientId = patient.id;
+    console.log("3. ID guardado:", selectedPatientId);
+
+    const fullName = `${patient.firstName ?? ''} ${patient.lastName ?? ''}`.trim() || patient.name || 'Paciente';
+    panelName.textContent = fullName;
+    panelAge.textContent = patient.age ? `${patient.age} años` : "Edad no especificada";
+
+    const imageSrc = patient.avatarURL || patient.photoURL;
+    if (imageSrc) {
+      panelImg.src = imageSrc;
+      panelImg.alt = fullName;
+      panelImg.style.display = "block";
+      panelFallback.style.display = "none";
+    } else {
+      panelImg.style.display = "none";
+      panelFallback.style.display = "flex";
+      panelInitials.textContent = fullName.charAt(0).toUpperCase();
+    }
+
+    panelCondition.textContent = (patient as any).condition || "Sin diagnóstico registrado";
+    panelNotes.textContent = (patient as any).notes || "Sin notas adicionales";
+
+    dialog?.showModal();
+  });
+
+  closeBtn?.addEventListener("click", () => dialog?.close());
+
+  dialog?.addEventListener("click", (e) => {
+    if (e.target === dialog) dialog?.close();
+  });
+
+  // Event listener asignado con arrow function
+  actionBtn?.addEventListener("click", () => {
+    console.log("¡CLICK REGISTRADO EN EL BOTÓN!");
+    
+    if (selectedPatientId !== null && selectedPatientId !== undefined) {
+      const url = `/games?patientId=${selectedPatientId}`;
+      console.log("4. Redirigiendo a:", url);
+      window.location.href = url;
+    } else {
+      alert("No hay ningún paciente seleccionado");
+    }
+  });
+</script>
+
+<style>
+  .patient-modal {
+    border: none;
+    border-radius: 12px;
+    padding: 0;
+    max-width: 500px;
+    width: 90%;
+    background: transparent;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    position: fixed;
+    inset: 0;
+    margin: auto;
+  }
+
+  .patient-modal::backdrop {
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(4px);
+  }
+
+  .modal-card {
+    position: relative;
+    background: #ffffff;
+    border-radius: 12px;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .close-btn {
+    position: absolute;
+    top: 12px;
+    right: 16px;
+    background: transparent;
+    border: none;
+    font-size: 1.5rem;
+    color: #9ca3af;
+    cursor: pointer;
+    line-height: 1;
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: color 0.15s ease;
+  }
+
+  .close-btn:hover { color: #1f2937; }
+  .modal-header { display: flex; align-items: center; gap: 16px; }
+  .modal-media { width: 72px; height: 72px; border-radius: 50%; overflow: hidden; background-color: #f3f4f6; flex-shrink: 0; }
+  .modal-image { width: 100%; height: 100%; object-fit: cover; }
+  .modal-image-fallback { width: 100%; height: 100%; background-color: #e5e7eb; display: flex; align-items: center; justify-content: center; }
+  .fallback-initials { font-size: 1.75rem; font-weight: 600; color: #6b7280; }
+  .header-info { display: flex; flex-direction: column; gap: 4px; }
+  .modal-heading { margin: 0; font-size: 1.25rem; color: #111827; font-weight: 700; }
+  .patient-subtext { margin: 0; font-size: 0.875rem; color: #6b7280; }
+  .modal-info { display: flex; flex-direction: column; gap: 12px; }
+  .info-group label { font-size: 0.75rem; text-transform: uppercase; font-weight: 600; color: #9ca3af; }
+  .info-value { margin: 4px 0 0 0; font-size: 0.95rem; color: #374151; }
+  .modal-actions { width: 100%; margin-top: 12px; display: flex; justify-content: flex-end; }
+  .action-btn { background-color: #2563eb; color: #ffffff; border: none; padding: 10px 20px; border-radius: 6px; font-weight: 600; font-size: 0.9rem; cursor: pointer; transition: background-color 0.2s ease; }
+  .action-btn:hover { background-color: #1d4ed8; }
+</style>

@@ -1,0 +1,49 @@
+---
+import "../css/dashboard.css"
+
+interface Props {
+  title?: string;
+  activeTab?: string;
+}
+
+const { title = "Mesa Interactiva - Launcher", activeTab = "pacientes" } = Astro.props;
+---
+
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{title}</title>
+  </head>
+  <body>
+    <div class="app-container">
+      <!-- Header Superior Blanco -->
+      <header class="top-header">
+        <div class="header-brand">
+          <div class="logo-placeholder"></div>
+          <h1>Mesa Interactiva</h1>
+        </div>
+        <div class="user-profile">
+          <span>Usuario: Administrador</span>
+        </div>
+      </header>
+
+      <!-- Barra de Pestañas / Navegación -->
+      <nav class="tabs-bar">
+        <a href="/" class={`tab-item ${activeTab === 'pacientes' ? 'active' : ''}`}>
+            Selección de Pacientes
+        </a>
+        <a href="/reportes" class={`tab-item ${activeTab === 'reportes' ? 'active' : ''}`}>
+            Reportes y Resultados
+        </a>
+      </nav>
+
+      <!-- Contenido Principal de las Pantallas -->
+      <main class="main-content">
+        <slot />
+      </main>
+    </div>
+  </body>
+</html>
+

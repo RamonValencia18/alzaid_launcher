@@ -1,0 +1,340 @@
+---
+import DashboardLayout from "../../../layouts/DashboardLayout.astro";
+import { MockGameService } from "../../../mock/MockServices/MockGameServices";
+import { MockPatientService } from "../../../mock/MockServices/MockPatientServices";
+
+export function getStaticPaths() {
+  const games = MockGameService.getAll();
+  return games.map((game) => ({
+    params: { id: game.id },
+  }));
+}
+
+const { id } = Astro.params;
+const game = MockGameService.getById(id!);
+const patients = MockPatientService.getAll();
+
+const today = new Date();
+const formattedDate = today.toLocaleDateString("es-ES", {
+  day: "2-digit",
+  month: "2-digit",
+  year: "numeric",
+});
+---
+
+<DashboardLayout
+  title={`Ejecución - ${game?.name ?? "Juego"}`}
+  activeTab="pacientes"
+>
+  <!-- Contenedor de datos oculto para transferir patients y gameId al cliente -->
+  <div
+    id="play-session-data"
+    data-patients={JSON.stringify(patients)}
+    data-game-id={game?.id ?? id}
+    style="display: none;"
+  ></div>
+
+  <div class="play-container">
+    <!-- Encabezado superior -->
+    <header class="play-header">
+      <div class="brand-section">
+        <a id="back-to-games" href="/games" class="back-link">← Volver</a>
+      </div>
+
+      <!-- Nombre del Paciente Seleccionado -->
+      <div class="patient-pill">
+        <span id="patient-name-display" class="patient-name-text">
+          Sin paciente seleccionado
+        </span>
+      </div>
+
+      <div class="date-badge">
+        <span>{formattedDate}</span>
+      </div>
+    </header>
+
+    <!-- Indicador del juego actual -->
+    <div class="game-tag-container">
+      <div class="game-tag">
+        {game?.name ?? "Juego No Encontrado"}
+      </div>
+    </div>
+
+    <!-- Panel de Control Principal -->
+    <main class="controls-section">
+      <button class="circle-btn start-btn" id="start-game-btn" type="button">
+        <span>Empezar</span>
+      </button>
+
+      <button class="circle-btn stop-btn" id="stop-game-btn" type="button">
+        <span>Detener</span>
+      </button>
+    </main>
+
+    <!-- Notas u observaciones -->
+    <footer class="notes-section">
+      <input
+        type="text"
+        id="game-notes"
+        class="notes-input"
+        placeholder="Notas (opcional)"
+      />
+    </footer>
+  </div>
+</DashboardLayout>
+
+<!-- Script sin define:vars para habilitar imports y bundler -->
+<script>
+  import type { Patient } from "../../../objects/Patient";
+
+  function setupPlaySession() {
+    console.log("🎮 Inicializando panel de ejecución de juego...");
+
+    const nameDisplay = document.getElementById("patient-name-display");
+    const backLink = document.getElementById("back-to-games") as HTMLAnchorElement | null;
+    const startBtn = document.getElementById("start-game-btn");
+    const stopBtn = document.getElementById("stop-game-btn");
+    const notesInput = document.getElementById("game-notes") as HTMLInputElement | null;
+    const dataContainer = document.getElementById("play-session-data");
+
+    if (!dataContainer) return;
+
+    // 1. Extraer gameId y patients del DOM
+    const gameId = dataContainer.getAttribute("data-game-id") || "";
+    const rawPatients = dataContainer.getAttribute("data-patients");
+    const patients: Patient[] = rawPatients ? JSON.parse(rawPatients) : [];
+
+    // 2. Leer patientId de los Query Params (?patientId=X)
+    const urlParams = new URLSearchParams(window.location.search);
+    const patientId = urlParams.get("patientId");
+
+    if (patientId) {
+      const patient = patients.find(
+        (p) => String(p.id).trim() === String(patientId).trim()
+      );
+
+      if (patient && nameDisplay) {
+        const fullName =
+          `${patient.firstName ?? ""} ${patient.lastName ?? ""}`.trim() ||
+          patient.name ||
+          `Paciente ${patient.id}`;
+        nameDisplay.textContent = fullName;
+      }
+
+      if (backLink) {
+        backLink.href = `/games?patientId=${encodeURIComponent(patientId)}`;
+      }
+    }
+
+    // 3. Registrar el evento del botón Empezar (Soporte Híbrido Tauri + Web Móvil)
+    startBtn?.addEventListener("click", async (e) => {
+      e.preventDefault();
+      const notes = notesInput?.value.trim() ?? "";
+      const payload = {
+        patientId: patientId ?? null,
+        patient_id: patientId ?? null, // Soporte para snake_case y camelCase
+        gameId: gameId,
+        game_id: gameId,
+        notes: notes,
+      };
+
+      console.log("🚀 Clic en 'Empezar' detectado. Enviando sesión...", payload);
+
+      try {
+        // Detectar si estamos dentro de la app nativa de Tauri
+        const isTauri = typeof window !== "undefined" && ("__TAURI_INTERNALS__" in window || "__TAURI__" in window);
+
+        if (isTauri) {
+          console.log("🖥️ Modo Nativo Tauri detectado");
+          const { invoke } = await import("@tauri-apps/api/core");
+          const response = await invoke("start_game_session", {
+            patientId: payload.patientId,
+            gameId: payload.gameId,
+            notes: payload.notes,
+          });
+          console.log("✅ Respuesta desde Rust (Tauri):", response);
+        } else {
+          console.log("📱 Modo Web/Móvil detectado. Enviando via API Axum...");
+          
+          // Enviamos la petición al servidor de Axum en la laptop usando el origin actual
+          const response = await fetch(`${window.location.origin}/session/start`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(payload),
+          });
+
+          const data = await response.json();
+          console.log("✅ Respuesta desde Rust (Axum):", data);
+
+          if (data.status === "SUCCESS") {
+            alert("🚀 ¡Juego iniciado en la laptop!");
+          } else {
+            alert("❌ Error del servidor: " + data.message);
+          }
+        }
+      } catch (err) {
+        console.error("❌ Error al intentar iniciar el juego:", err);
+        alert("Ocurrió un error al enviar la señal al servidor.");
+      }
+    });
+
+    stopBtn?.addEventListener("click", () => {
+      console.log("🛑 Juego detenido");
+    });
+  }
+
+  // Inicializar en carga directa y navegación cliente
+  setupPlaySession();
+  document.addEventListener("astro:page-load", setupPlaySession);
+</script>
+
+<style>
+  .play-container {
+    background-color: #f3f4f6;
+    border-radius: 12px;
+    padding: 24px;
+    border: 1px solid #d1d5db;
+    max-width: 900px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+  }
+
+  .play-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .back-link {
+    color: #4b5563;
+    text-decoration: none;
+    font-weight: 500;
+    font-size: 0.9rem;
+    transition: color 0.15s ease;
+  }
+
+  .back-link:hover {
+    color: #111827;
+  }
+
+  .patient-pill {
+    background-color: #4ade80;
+    border-radius: 8px;
+    border: 1px solid #22c55e;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    padding: 8px 18px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .patient-name-text {
+    color: #064e3b;
+    font-weight: 700;
+    font-size: 1.05rem;
+    font-family: inherit;
+  }
+
+  .date-badge {
+    color: #374151;
+    font-weight: 600;
+    font-size: 1rem;
+  }
+
+  .game-tag-container {
+    display: flex;
+    justify-content: center;
+  }
+
+  .game-tag {
+    background-color: #dbeafe;
+    color: #1e40af;
+    border: 1px solid #93c5fd;
+    padding: 10px 36px;
+    border-radius: 8px;
+    font-size: 1.1rem;
+    font-weight: 600;
+    text-align: center;
+    min-width: 140px;
+  }
+
+  .controls-section {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 60px;
+    padding: 20px 0;
+  }
+
+  .circle-btn {
+    width: 140px;
+    height: 140px;
+    border-radius: 50%;
+    border: 2px solid rgba(0, 0, 0, 0.1);
+    font-size: 1.1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition:
+      transform 0.15s ease,
+      box-shadow 0.15s ease,
+      background-color 0.15s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .circle-btn:hover {
+    transform: scale(1.04);
+  }
+
+  .circle-btn:active {
+    transform: scale(0.98);
+  }
+
+  .start-btn {
+    background-color: #bbf7d0;
+    color: #14532d;
+  }
+
+  .start-btn:hover {
+    background-color: #86efac;
+  }
+
+  .stop-btn {
+    background-color: #fca5a5;
+    color: #7f1d1d;
+  }
+
+  .stop-btn:hover {
+    background-color: #f87171;
+  }
+
+  .notes-section {
+    display: flex;
+    justify-content: center;
+  }
+
+  .notes-input {
+    width: 100%;
+    padding: 14px 20px;
+    border-radius: 8px;
+    border: 1px solid #9ca3af;
+    background-color: #ffffff;
+    font-size: 0.95rem;
+    font-style: italic;
+    color: #374151;
+    box-sizing: border-box;
+    text-align: center;
+  }
+
+  .notes-input:focus {
+    outline: 2px solid #3b82f6;
+    border-color: transparent;
+    font-style: normal;
+  }
+</style>

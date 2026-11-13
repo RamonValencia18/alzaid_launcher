@@ -1,0 +1,49 @@
+---
+import DashboardLayout from "../layouts/DashboardLayout.astro";
+import PatientCard from "../components/patient-card.astro";
+import PatientPanel from "../components/patient-panel.astro";
+import { MockPatientService } from "../mock/MockServices/MockPatientServices";
+import "../css/patients.css";
+
+const patients = MockPatientService.getAll();
+---
+
+<DashboardLayout title="Pacientes - Mesa Interactiva" activeTab="pacientes">
+  <div class="card">
+    <h2>Pacientes Registrados</h2>
+    <div id="patients-container" class="patients-cards">
+      {patients.map((patient) => (
+        <PatientCard patient={patient} />
+      ))}
+    </div>
+  </div>
+
+  <PatientPanel />
+</DashboardLayout>
+
+<script>
+  import type { Patient } from "../objects/Patient";
+
+  const container = document.getElementById("patients-container");
+
+  // Delegación de eventos para capturar el click en cualquier tarjeta de paciente
+  container?.addEventListener("click", (e) => {
+    const card = (e.target as HTMLElement).closest<HTMLElement>(".patient-card");
+    if (!card) return;
+
+    const rawData = card.getAttribute("data-patient");
+    if (!rawData) return;
+
+    try {
+      // Decodificamos la cadena URL-encoded antes del JSON.parse
+      const patient: Patient = JSON.parse(decodeURIComponent(rawData));
+
+      // Emitir evento global para que PatientPanel lo reciba
+      window.dispatchEvent(
+        new CustomEvent("patient:open", { detail: { patient } })
+      );
+    } catch (err) {
+      console.error("Error al procesar la información del paciente:", err);
+    }
+  });
+</script>

@@ -1,0 +1,207 @@
+---
+import DashboardLayout from "../layouts/DashboardLayout.astro";
+import GameCard from "../components/game-card.astro";
+import GamePanel from "../components/game-panel.astro";
+import { MockGameService } from "../mock/MockServices/MockGameServices";
+import { MockPatientService } from "../mock/MockServices/MockPatientServices";
+import "../css/games.css";
+
+const games = MockGameService.getAll();
+const allPatients = MockPatientService.getAll();
+---
+
+<DashboardLayout title="Juegos - Mesa Interactiva" activeTab="pacientes">
+  <div class="games-page-layout">
+    
+    <!-- Columna Principal: Juegos -->
+    <div class="card games-main-card">
+      <div class="games-header">
+        <h2>Juegos Disponibles</h2>
+        <!-- Badge del paciente seleccionado -->
+        <span id="patient-badge" class="active-patient-badge" style="display: none;"></span>
+      </div>
+
+      <div id="games-container" class="games-cards">
+        {games.map((game) => <GameCard game={game} />)}
+      </div>
+    </div>
+
+    <!-- Columna Lateral: Tarjeta del Paciente -->
+    <aside id="patient-sidebar" class="sidebar-patient" style="display: none;">
+      <div class="sidebar-patient-header">
+        <span>Paciente Actual</span>
+        <!-- Botón para regresar a la lista de pacientes -->
+        <a href="/patients" class="change-patient-link" title="Regresar a selección de pacientes">
+          ← Cambiar
+        </a>
+      </div>
+      
+      <div id="patient-card-render" class="patient-card-wrapper"></div>
+    </aside>
+
+  </div>
+
+  <GamePanel />
+</DashboardLayout>
+
+<script define:vars={{ allPatients }}>
+  function loadSelectedPatient() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const patientId = urlParams.get("patientId");
+
+    if (!patientId) return;
+
+    const patient = allPatients.find(p => String(p.id).trim() === String(patientId).trim());
+
+    if (patient) {
+      const badge = document.getElementById("patient-badge");
+      const sidebar = document.getElementById("patient-sidebar");
+      const renderContainer = document.getElementById("patient-card-render");
+
+      if (badge && sidebar && renderContainer) {
+        badge.innerHTML = `Paciente: <strong>${patient.firstName || patient.name}</strong>`;
+        badge.style.display = "inline-block";
+
+        const fullName = `${patient.firstName ?? ''} ${patient.lastName ?? ''}`.trim() || patient.name || 'Paciente';
+        const imageSrc = patient.avatarURL || patient.photoURL;
+
+        renderContainer.innerHTML = `
+          <div class="patient-card" style="display: flex; flex-direction: column; align-items: center; padding: 24px 20px; background-color: #ffffff; border: 1px solid #e5e7eb; border-radius: 12px; width: 100%; box-sizing: border-box; text-align: center;">
+            <div style="width: 80px; height: 80px; border-radius: 50%; overflow: hidden; background-color: #f3f4f6; margin-bottom: 16px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+              ${imageSrc 
+                ? `<img src="${imageSrc}" alt="${fullName}" style="width: 100%; height: 100%; object-fit: cover;" />`
+                : `<span style="font-size: 1.75rem; font-weight: 600; color: #6b7280;">${fullName.charAt(0).toUpperCase()}</span>`
+              }
+            </div>
+            <div style="width: 100%;">
+              <h3 style="color: #1f2937; font-size: 1.1rem; font-weight: 600; margin: 0 0 4px 0;">${fullName}</h3>
+              ${patient.age ? `<p style="color: #6b7280; font-size: 0.875rem; margin: 0;">${patient.age} años</p>` : ''}
+            </div>
+          </div>
+        `;
+
+        sidebar.style.display = "flex";
+      }
+    }
+  }
+
+  loadSelectedPatient();
+  document.addEventListener("astro:page-load", loadSelectedPatient);
+</script>
+
+<script>
+  import type { Game } from "../objects/Game";
+
+  const container = document.getElementById("games-container");
+
+  container?.addEventListener("click", (e) => {
+    const card = (e.target as HTMLElement).closest<HTMLElement>(".game-card");
+    if (!card) return;
+
+    const rawData = card.getAttribute("data-game");
+    if (!rawData) return;
+
+    try {
+      const game: Game = JSON.parse(rawData);
+      window.dispatchEvent(
+        new CustomEvent("game:open", { detail: { game } })
+      );
+    } catch (err) {
+      console.error("Error al leer la información del juego:", err);
+    }
+  });
+</script>
+
+<style>
+  .games-page-layout {
+    display: flex;
+    gap: 24px;
+    align-items: flex-start;
+    width: 100%;
+  }
+
+  .games-main-card {
+    flex: 1;
+    min-width: 0;
+    align-items: stretch !important;
+  }
+
+  .games-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    width: 100%;
+  }
+
+  .games-header h2 {
+    margin: 0 !important;
+  }
+
+  .active-patient-badge {
+    font-size: 0.85rem;
+    color: #1e40af;
+    background-color: #dbeafe;
+    padding: 6px 14px;
+    border-radius: 9999px;
+    font-weight: 500;
+  }
+
+  .sidebar-patient {
+    width: 280px;
+    flex-shrink: 0;
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 16px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .sidebar-patient-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #f3f4f6;
+    padding-bottom: 8px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #4b5563;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  /* Estilos para el botón de regresar/cambiar paciente */
+  .change-patient-link {
+    color: #2563eb;
+    text-decoration: none;
+    font-size: 0.8rem;
+    font-weight: 600;
+    padding: 4px 8px;
+    border-radius: 6px;
+    background-color: #eff6ff;
+    transition: all 0.15s ease;
+  }
+
+  .change-patient-link:hover {
+    background-color: #dbeafe;
+    color: #1d4ed8;
+  }
+
+  .patient-card-wrapper {
+    display: flex;
+    justify-content: center;
+    width: 100%;
+  }
+
+  @media (max-width: 850px) {
+    .games-page-layout {
+      flex-direction: column-reverse;
+    }
+    .sidebar-patient {
+      width: 100%;
+    }
+  }
+</style>

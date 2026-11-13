@@ -1,0 +1,144 @@
+---
+import type { Patient } from '../objects/Patient';
+
+interface Props {
+  patient: Patient;
+}
+
+const { patient } = Astro.props;
+
+// Soporte para avatar o foto, evitando cadenas vacías
+const imageSrc = patient.avatarURL || patient.photoURL;
+const fullName = 
+  `${patient.firstName ?? ''} ${patient.lastName ?? ''}`.trim() || 
+  patient.name || 
+  'Paciente';
+const patientData = encodeURIComponent(JSON.stringify(patient));
+---
+
+<div class="patient-card" data-patient={patientData} tabindex="0" role="button">
+  <!-- Contenedor principal de la foto del paciente -->
+  <div class="image-wrapper">
+    {imageSrc ? (
+      <img 
+        src={imageSrc} 
+        alt={fullName} 
+        class="patient-image" 
+        loading="lazy" 
+        decoding="async" 
+      />
+    ) : (
+      <div class="image-fallback">
+        <span class="fallback-initials">
+          {fullName.charAt(0).toUpperCase()}
+        </span>
+      </div>
+    )}
+  </div>
+
+  <!-- Contenedor de la información del paciente -->
+  <div class="info-wrapper">
+    <h3 class="patient-name">{fullName}</h3>
+    {patient.age && <p class="patient-detail">{patient.age} años</p>}
+  </div>
+</div>
+
+<style>
+  /* Tarjeta rectangular tipo card, más amplia y vertical */
+  .patient-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 20px;
+    background-color: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    width: 100%;
+    max-width: 280px;
+    box-sizing: border-box;
+    transition: all 0.2s ease;
+    cursor: pointer;
+    outline: none;
+    text-align: center;
+  }
+
+  /* Efecto hover y focus */
+  .patient-card:hover,
+  .patient-card:focus-visible {
+    background-color: #f9fafb;
+    border-color: #d1d5db;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08);
+    transform: translateY(-2px);
+  }
+
+  .patient-card:focus-visible {
+    outline: 2px solid #2563eb;
+    outline-offset: 2px;
+  }
+
+  /* Contenedor de la imagen significativamente más grande */
+  .image-wrapper {
+    width: 96px;
+    height: 96px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    overflow: hidden;
+    border-radius: 50%; /* Puedes usar 12px si prefieres bordes redondeados tipo tarjeta */
+    background-color: #f3f4f6;
+    margin-bottom: 16px;
+    border: 2px solid #f3f4f6;
+  }
+
+  /* Imagen del paciente */
+  .patient-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  /* Fallback cuando no hay foto (muestra la inicial) */
+  .image-fallback {
+    width: 100%;
+    height: 100%;
+    background-color: #e5e7eb;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .fallback-initials {
+    font-size: 2rem;
+    font-weight: 600;
+    color: #6b7280;
+  }
+
+  /* Contenedor de texto */
+  .info-wrapper {
+    width: 100%;
+    min-width: 0;
+  }
+
+  /* Nombre del paciente */
+  .patient-name {
+    color: #1f2937;
+    font-family: system-ui, -apple-system, sans-serif;
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin: 0 0 4px 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Detalles secundarios opcionales */
+  .patient-detail {
+    color: #6b7280;
+    font-family: system-ui, -apple-system, sans-serif;
+    font-size: 0.875rem;
+    margin: 0;
+  }
+</style>
+

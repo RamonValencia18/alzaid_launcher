@@ -1,0 +1,100 @@
+---
+import type { Game } from '../objects/Game';
+
+interface Props {
+  game: Game;
+}
+
+const { game } = Astro.props;
+const iconSrc = game.iconURL ?? game.imageURL;
+const title = game.name;
+---
+
+<div class="game-card" data-game={JSON.stringify(game)}>
+  <!-- Contenedor del icono/imagen del juego -->
+  <div class="icon-wrapper">
+    {iconSrc ? (
+      <img src={iconSrc} alt={title} class="game-icon" />
+    ) : (
+      <div class="icon-fallback" />
+    )}
+  </div>
+
+  <!-- Contenedor de la información -->
+  <div class="info-wrapper">
+    <h3 class="game-title">{title}</h3>
+  </div>
+</div>
+
+<style>
+  /* Fila horizontal compacta en estilo claro */
+  .game-card {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 12px 16px;
+    background-color: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    width: 100%;
+    max-width: 420px;
+    box-sizing: border-box;
+    transition: all 0.2s ease;
+    cursor: pointer; /* Indicar que es clickeable */
+  }
+
+  /* Efecto hover interactivo en modo claro */
+  .game-card:hover {
+    background-color: #f9fafb;
+    border-color: #d1d5db;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    transform: translateY(-1px);
+  }
+
+  /* Contenedor estricto para el icono */
+  .icon-wrapper {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    overflow: hidden;
+    border-radius: 6px;
+    background-color: #f3f4f6;
+  }
+
+  /* Imagen del icono */
+  .game-icon {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    image-rendering: pixelated;
+  }
+
+  /* Espacio vacío si no viene imagen */
+  .icon-fallback {
+    width: 100%;
+    height: 100%;
+    background-color: #e5e7eb;
+  }
+
+  /* Contenedor del título */
+  .info-wrapper {
+    flex-grow: 1;
+    min-width: 0;
+  }
+
+  /* Título del juego en tono oscuro para lectura clara */
+  .game-title {
+    color: #1f2937;
+    font-family: system-ui, -apple-system, sans-serif;
+    font-size: 0.95rem;
+    font-weight: 600;
+    margin: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+</style>
