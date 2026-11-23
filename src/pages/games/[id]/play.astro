@@ -85,6 +85,7 @@ const formattedDate = today.toLocaleDateString("es-ES", {
 
 <!-- Script sin define:vars para habilitar imports y bundler -->
 <script>
+
   import type { Patient } from "../../../objects/Patient";
 
   function setupPlaySession() {
@@ -99,12 +100,15 @@ const formattedDate = today.toLocaleDateString("es-ES", {
 
     if (!dataContainer) return;
 
-    // 1. Extraer gameId y patients del DOM
-    const gameId = dataContainer.getAttribute("data-game-id") || "";
+    // 1. Extraer gameId del DOM (Asegúrese de que corresponda al nombre del archivo Python, ej: "Drag Objects")
+    const rawGameId = dataContainer.getAttribute("data-game-id") || "";
+    // Si gameId es un id tipo "1", mapeamos o aseguramos el nombre real del minijuego:
+    const gameId = rawGameId === "1" ? "Drag Objects" : rawGameId;
+
     const rawPatients = dataContainer.getAttribute("data-patients");
     const patients: Patient[] = rawPatients ? JSON.parse(rawPatients) : [];
 
-    // 2. Leer patientId de los Query Params (?patientId=X)
+    // 2. Leer patientId de los Query Params
     const urlParams = new URLSearchParams(window.location.search);
     const patientId = urlParams.get("patientId");
 
@@ -126,14 +130,14 @@ const formattedDate = today.toLocaleDateString("es-ES", {
       }
     }
 
-    // 3. Registrar el evento del botón Empezar (Soporte Híbrido Tauri + Web Móvil)
+    // 3. Clic en 'Empezar'
     startBtn?.addEventListener("click", async (e) => {
       e.preventDefault();
       const notes = notesInput?.value.trim() ?? "";
+
+      // Payload estandarizado en snake_case para Rust
       const payload = {
-        patientId: patientId ?? null,
-        patient_id: patientId ?? null, // Soporte para snake_case y camelCase
-        gameId: gameId,
+        patient_id: patientId ?? null,
         game_id: gameId,
         notes: notes,
       };
@@ -141,23 +145,27 @@ const formattedDate = today.toLocaleDateString("es-ES", {
       console.log("🚀 Clic en 'Empezar' detectado. Enviando sesión...", payload);
 
       try {
-        // Detectar si estamos dentro de la app nativa de Tauri
         const isTauri = typeof window !== "undefined" && ("__TAURI_INTERNALS__" in window || "__TAURI__" in window);
 
         if (isTauri) {
           console.log("🖥️ Modo Nativo Tauri detectado");
           const { invoke } = await import("@tauri-apps/api/core");
-          const response = await invoke("start_game_session", {
-            patientId: payload.patientId,
-            gameId: payload.gameId,
-            notes: payload.notes,
+          // Si invoca comando nativo de Tauri:
+          const response = await invoke('start_game_session', { 
+              patientId: patientId, 
+              gameId: gameId,
+              notes: notes 
           });
-          console.log("✅ Respuesta desde Rust (Tauri):", response);
+          console.log("✅ Respuesta desde Rust (Tauri IPC):", response);
         } else {
-          console.log("📱 Modo Web/Móvil detectado. Enviando via API Axum...");
+          console.log("📱 Modo Web/Móvil detectado. Enviando a Axum en puerto 8080...");
           
-          // Enviamos la petición al servidor de Axum en la laptop usando el origin actual
-          const response = await fetch(`${window.location.origin}/session/start`, {
+          // ⚠️ APUNTAR AL PUERTO 8080 DEL SERVIDOR AXUM
+          // En red local use la IP de la laptop o localhost si prueba en la misma máquina
+          const serverHost = window.location.hostname; // ej: "localhost" o "192.168.1.50"
+          const targetUrl = `http://${serverHost}:8080/session/start`;
+
+          const response = await fetch(targetUrl, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -165,18 +173,22 @@ const formattedDate = today.toLocaleDateString("es-ES", {
             body: JSON.stringify(payload),
           });
 
+          if (!response.ok) {
+            throw new Error(`HTTP Error: ${response.status}`);
+          }
+
           const data = await response.json();
           console.log("✅ Respuesta desde Rust (Axum):", data);
 
           if (data.status === "SUCCESS") {
-            alert("🚀 ¡Juego iniciado en la laptop!");
+            alert("🚀 ¡Juego iniciado correctamente!");
           } else {
             alert("❌ Error del servidor: " + data.message);
           }
         }
       } catch (err) {
         console.error("❌ Error al intentar iniciar el juego:", err);
-        alert("Ocurrió un error al enviar la señal al servidor.");
+        alert("Ocurrió un error al enviar la señal al servidor Axum (Compruebe puerto 8080).");
       }
     });
 
@@ -185,7 +197,6 @@ const formattedDate = today.toLocaleDateString("es-ES", {
     });
   }
 
-  // Inicializar en carga directa y navegación cliente
   setupPlaySession();
   document.addEventListener("astro:page-load", setupPlaySession);
 </script>
