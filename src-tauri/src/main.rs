@@ -2,4 +2,9 @@
 
 fn main() {
     app_lib::run();
+    if let Err(e) = dotenvy::dotenv() {
+        println!("⚠️ [Env] No se encontró el archivo .env o no se pudo cargar: {}", e);
+    } else {
+        println!("✅ [Env] Variables de entorno cargadas correctamente.");
+    }
 }
